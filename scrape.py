@@ -6,31 +6,34 @@ from bs4 import BeautifulSoup
 import json
 import re
 
-import random
-colorDict = {
-    "CMPUT": "#3f87a6",
-    "ZOOL": "#41ffd5",
-    "PHYSL": "#603fdb",
-    "ANAT": "#1e776b",
-    "CELL": "#dc5b0c",
-    "BIOCH": "#5fbd2a",
-    "MDGEN": "#401452",
-    "NEURO": "#7b1905",
-    "ONCOL": "#72961e",
-    "PMCOL": "#79ecfa",
-    "CHEM": "#055d32",
-    "BIOIN": "#e87b4f",
-    "ASTRO": "#8a8ea1",
-    "PSYCO": "#62755d",
-    "MICRB": "#02891f",
-    "PHYS": "#cf60f4",
-    "MATH": "#053975",
-    "STAT": "#084444",
-    "BIOL": "#c6819b",
-    "GENET": "#835845",
-    "IMIN": "#75dc4d",
-}
+import seaborn as sns
 
+subjects = [
+    "CMPUT",
+    "ZOOL",
+    "PHYSL",
+    "ANAT",
+    "CELL",
+    "BIOCH",
+    "MDGEN",
+    "NEURO",
+    "ONCOL",
+    "PMCOL",
+    "CHEM",
+    "BIOIN",
+    "ASTRO",
+    "PSYCO",
+    "MICRB",
+    "PHYS",
+    "MATH",
+    "STAT",
+    "BIOL",
+    "GENET",
+    "IMIN"
+]
+
+colorDict = dict(zip(subjects, ["rgb" + str(tuple(int(c*255) for c in cs)) for cs in sns.color_palette("husl", len(subjects))]))
+print(colorDict)
 
 scrapeData = []
 
