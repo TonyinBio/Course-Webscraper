@@ -6,6 +6,32 @@ from bs4 import BeautifulSoup
 import json
 import re
 
+import random
+colorDict = {
+    "CMPUT": "#3f87a6",
+    "ZOOL": "#41ffd5",
+    "PHYSL": "#603fdb",
+    "ANAT": "#1e776b",
+    "CELL": "#dc5b0c",
+    "BIOCH": "#5fbd2a",
+    "MDGEN": "#401452",
+    "NEURO": "#7b1905",
+    "ONCOL": "#72961e",
+    "PMCOL": "#79ecfa",
+    "CHEM": "#055d32",
+    "BIOIN": "#e87b4f",
+    "ASTRO": "#8a8ea1",
+    "PSYCO": "#62755d",
+    "MICRB": "#02891f",
+    "PHYS": "#cf60f4",
+    "MATH": "#053975",
+    "STAT": "#084444",
+    "BIOL": "#c6819b",
+    "GENET": "#835845",
+    "IMIN": "#75dc4d",
+}
+
+
 scrapeData = []
 
 def getNodes(URL):
@@ -149,8 +175,10 @@ for node in scrapeData:
     if len(matches) > 0:
         print("Already have nodes for: " + node["title"] + ". Skipping node")
         continue
-
-    data["nodes"].append({ "id": nodeIdCounter, "title": node["title"], "desc": node["desc"]})
+    
+    subject = re.search("[A-Z]*", node["title"])
+    color = colorDict[subject.group()]
+    data["nodes"].append({ "id": nodeIdCounter, "title": node["title"], "desc": node["desc"], "color": color})
     nodeIdCounter += 1
 
     coreqs = re.search("(?<=Corequisites: ).*?(?=( [cC]redit)|(.$))", desc)
