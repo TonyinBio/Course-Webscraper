@@ -27,8 +27,26 @@ def getNodes(URL):
 
 URLs = [
     "https://apps.ualberta.ca/catalogue/course/cmput",
-    # "https://apps.ualberta.ca/catalogue/course/zool",
-    # "https://apps.ualberta.ca/catalogue/course/physl"
+    "https://apps.ualberta.ca/catalogue/course/zool",
+    "https://apps.ualberta.ca/catalogue/course/physl",
+    "https://apps.ualberta.ca/catalogue/course/anat",
+    "https://apps.ualberta.ca/catalogue/course/cell",
+    "https://apps.ualberta.ca/catalogue/course/bioch",
+    "https://apps.ualberta.ca/catalogue/course/mdgen",
+    "https://apps.ualberta.ca/catalogue/course/neuro",
+    "https://apps.ualberta.ca/catalogue/course/oncol",
+    "https://apps.ualberta.ca/catalogue/course/pmcol",
+    "https://apps.ualberta.ca/catalogue/course/chem",
+    "https://apps.ualberta.ca/catalogue/course/bioin",
+    "https://apps.ualberta.ca/catalogue/course/astro",
+    "https://apps.ualberta.ca/catalogue/course/psyco",
+    "https://apps.ualberta.ca/catalogue/course/micrb",
+    "https://apps.ualberta.ca/catalogue/course/phys",
+    "https://apps.ualberta.ca/catalogue/course/math",
+    "https://apps.ualberta.ca/catalogue/course/stat",
+    "https://apps.ualberta.ca/catalogue/course/biol",
+    "https://apps.ualberta.ca/catalogue/course/genet",
+    "https://apps.ualberta.ca/catalogue/course/imin"
 ]
 for URL in URLs:
     getNodes(URL)
@@ -47,7 +65,6 @@ def parseReqs(string, target, rORc):
     for greq in greqArray:
         #find multiple possible courses
         if re.search("^\d{3}", greq):
-            print(greq)
             index = greqArray.index(greq)
             prevGreq = re.search("[A-Z]*", greqArray[index - 1])
 
@@ -85,7 +102,7 @@ def parseReqs(string, target, rORc):
             
         else:
             #check for common exceptions
-            if "consent of the instructor" in greq:
+            if "consent" in greq:
                 break
 
             #get manual input
@@ -113,7 +130,6 @@ def parseReqs(string, target, rORc):
                 if len(source) == 1:
                     valid = True
                     data["links"].append({ "source": source[0], "target": target, "type": "multi" + rORc})
-                    print("Course entered: " + source[0])
                 else:
                     valid = False
                     print("**Invalid entry**")
@@ -137,8 +153,8 @@ for node in scrapeData:
     data["nodes"].append({ "id": nodeIdCounter, "title": node["title"], "desc": node["desc"]})
     nodeIdCounter += 1
 
-    coreqs = re.search("(?<=Corequisites: ).*(?=.$)", desc)
-    reqs = re.search("(?<=Prerequisites: ).*(?=.$)", desc)
+    coreqs = re.search("(?<=Corequisites: ).*?(?=( [cC]redit)|(.$))", desc)
+    reqs = re.search("(?<=Prerequisites: ).*?(?=( [cC]redit)|(.$))", desc)
     if coreqs and reqs:
 
         reqs = re.search("(?<=Prerequisites: ).*(?=. Corequisites)", desc)
@@ -172,6 +188,8 @@ updateDesc()
 
 def renameLinks():
     for link in data["links"]:
+        if type(link["source"]) is int:
+            continue
         sourceId = [node["id"] for node in data["nodes"] if node["title"] == link["source"]]
         targetId = [node["id"] for node in data["nodes"] if node["title"] == link["target"]]
 
