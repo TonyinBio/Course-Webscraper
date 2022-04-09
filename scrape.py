@@ -78,10 +78,19 @@ for URL in URLs:
     getNodes(URL)
 
 
-with open('course2.json', encoding = 'utf-8') as json_file:
-    data = json.load(json_file)
+# with open('course2.json', encoding = 'utf-8') as json_file:
+#     data = json.load(json_file)
+# highestNode = max(data["nodes"], key = lambda node: node["id"])
+# nodeIdCounter = highestNode["id"]
+
+data = {
+    "nodes" : [],
+    "links" : []
+}
+nodeIdCounter = 0
 
 scrapeTitles = []
+
 
 
 def parseReqs(string, target, rORc):
@@ -137,8 +146,11 @@ def parseReqs(string, target, rORc):
                 print("**Need manual input**")
                 print("Requisite: " + greq)
                 
-                source = input()
 
+
+                ### Currently set to skip for developing ###
+                source = "skip"
+                
                 if source == "skip":
                     break
                 if source == "more info":
@@ -160,9 +172,6 @@ def parseReqs(string, target, rORc):
                     valid = False
                     print("**Invalid entry**")
         
-
-highestNode = max(data["nodes"], key = lambda node: node["id"])
-nodeIdCounter = highestNode["id"]
 
 #Create new nodes and links
 for node in scrapeData:
@@ -212,8 +221,6 @@ def updateDesc():
             node.update({"desc": "From course catalogue: " + getDesc(node["title"])})
 updateDesc()
 
-
-
 def renameLinks():
     for link in data["links"]:
         if type(link["source"]) is int:
@@ -233,10 +240,14 @@ def renameLinks():
             print("I'm not sure what happened")
 renameLinks()
 
-        
+def removeNodes():
+    for node in data["nodes"]:
+        linksThatTarget = [link for link in data["links"] if link["target"] == node["id"]]
+        linksThatUse = [link for link in data["links"] if link["source"] == node["id"]]
 
-
-
+        if len(linksThatTarget) == 0 and len(linksThatUse) == 0:
+            data["nodes"] = [dNode for dNode in data["nodes"] if dNode["title"] != node["title"]]
+removeNodes()
 
 with open("UPcourse2.json", "w") as outfile:
     json.dump(data, outfile)
