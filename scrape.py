@@ -45,9 +45,11 @@ def getNodes(URL):
         desc = element.find("p")
 
         if title: 
-            title = re.search(".+(?= -)", title.text)
+            descTitle = re.search("(?<=- ).*", title.text)
+            title = re.search("^.*?(?= -)", title.text)
+
             if desc:
-                scrapeData.append({ "title" : title.group(), "desc" : desc.text })
+                scrapeData.append({ "title" : title.group(), "desc" : descTitle.group() + " -- \n" + desc.text })
             else:
                 scrapeData.append({ "title" : title.group(), "desc" : "No description" })
 
@@ -175,9 +177,8 @@ def parseReqs(string, target, rORc):
 
 #Create new nodes and links
 for node in scrapeData:
-    desc = node["desc"]
-    if desc == "No description":
-        print("No description for: " + node["title"] + ". Skipping node")
+    if node["desc"] == "No description":
+        # print("No description for: " + node["title"] + ". Skipping node")
         continue
     
     matches = [dNode["title"] for dNode in data["nodes"] if dNode["title"] == node["title"]]
@@ -190,11 +191,11 @@ for node in scrapeData:
     data["nodes"].append({ "id": nodeIdCounter, "title": node["title"], "desc": node["desc"], "color": color})
     nodeIdCounter += 1
 
-    coreqs = re.search("(?<=Corequisites: ).*?(?=( [cC]redit)|(.$))", desc)
-    reqs = re.search("(?<=Prerequisites: ).*?(?=( [cC]redit)|(.$))", desc)
+    coreqs = re.search("(?<=Corequisites: ).*?(?=( [cC]redit)|(.$))", node["desc"])
+    reqs = re.search("(?<=Prerequisites: ).*?(?=( [cC]redit)|(.$))", node["desc"])
     if coreqs and reqs:
 
-        reqs = re.search("(?<=Prerequisites: ).*(?=. Corequisites)", desc)
+        reqs = re.search("(?<=Prerequisites: ).*(?=. Corequisites)", node["desc"])
         parseReqs(reqs.group(), node["title"], "R")
         parseReqs(coreqs.group(), node["title"], "C")
 
@@ -206,20 +207,20 @@ for node in scrapeData:
     else:
         continue
 
-def updateDesc():
-    for node in scrapeData:
-        scrapeTitles.append(node["title"])
+# def updateDesc():
+#     for node in scrapeData:
+#         scrapeTitles.append(node["title"])
 
-    def getDesc(title):
-        for node in scrapeData:
-            if node["title"] == title:
-                return node["desc"]
+#     def getDesc(title):
+#         for node in scrapeData:
+#             if node["title"] == title:
+#                 return node["desc"]
 
 
-    for node in data["nodes"]:
-        if node["title"] in scrapeTitles and "desc" not in node:
-            node.update({"desc": "From course catalogue: " + getDesc(node["title"])})
-updateDesc()
+#     for node in data["nodes"]:
+#         if node["title"] in scrapeTitles and "desc" not in node:
+#             node.update({"desc": "From course catalogue: " + getDesc(node["title"])})
+# updateDesc()
 
 def renameLinks():
     for link in data["links"]:
