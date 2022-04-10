@@ -29,11 +29,21 @@ subjects = [
     "STAT",
     "BIOL",
     "GENET",
-    "IMIN"
+    "IMIN",
+    "ENGG",
+    "ANTHR",
+    "FS",
+    "ENGL",
+    "WRS",
+    "HIST",
+    "PHIL",
+    "SOC",
+    "ECON",
+    "ENT",
+    "FIN"
 ]
 
 colorDict = dict(zip(subjects, ["rgb" + str(tuple(int(c*255) for c in cs)) for cs in sns.color_palette("husl", len(subjects))]))
-print(colorDict)
 
 scrapeData = []
 
@@ -56,29 +66,11 @@ def getNodes(URL):
             else:
                 scrapeData.append({ "title" : title.group(), "desc" : "No description" })
 
-URLs = [
-    "https://apps.ualberta.ca/catalogue/course/cmput",
-    "https://apps.ualberta.ca/catalogue/course/zool",
-    "https://apps.ualberta.ca/catalogue/course/physl",
-    "https://apps.ualberta.ca/catalogue/course/anat",
-    "https://apps.ualberta.ca/catalogue/course/cell",
-    "https://apps.ualberta.ca/catalogue/course/bioch",
-    "https://apps.ualberta.ca/catalogue/course/mdgen",
-    "https://apps.ualberta.ca/catalogue/course/neuro",
-    "https://apps.ualberta.ca/catalogue/course/oncol",
-    "https://apps.ualberta.ca/catalogue/course/pmcol",
-    "https://apps.ualberta.ca/catalogue/course/chem",
-    "https://apps.ualberta.ca/catalogue/course/bioin",
-    "https://apps.ualberta.ca/catalogue/course/astro",
-    "https://apps.ualberta.ca/catalogue/course/psyco",
-    "https://apps.ualberta.ca/catalogue/course/micrb",
-    "https://apps.ualberta.ca/catalogue/course/phys",
-    "https://apps.ualberta.ca/catalogue/course/math",
-    "https://apps.ualberta.ca/catalogue/course/stat",
-    "https://apps.ualberta.ca/catalogue/course/biol",
-    "https://apps.ualberta.ca/catalogue/course/genet",
-    "https://apps.ualberta.ca/catalogue/course/imin"
-]
+URLs = []
+for subject in subjects:
+    URLs.append("https://apps.ualberta.ca/catalogue/course/" + subject.lower())
+print(URLs)
+
 for URL in URLs:
     getNodes(URL)
 
@@ -101,16 +93,23 @@ scrapeTitles = []
 def parseReqs(string, target, rORc):
     #split string based on different courses
 
+
+    ##TODO: Improve splitter
     greqArray = re.split("(?:(?:;)? and )|; ", string)
     for greq in greqArray:
         #find multiple possible courses
+
+        if re.search("\d{3}", greq) == None:
+            print("Skipping: " + greq)
+            continue
+
         if re.search("^\d{3}", greq):
             index = greqArray.index(greq)
             prevGreq = re.search("[A-Z]*", greqArray[index - 1])
 
             greq = prevGreq.group() + " " + greq
 
-        duplicates = re.findall("(?:[A-Z]+ \d{3})|(?:\d{3}(?!-))", greq)
+        duplicates = re.findall("(?:(?<![a-z,])[A-Z ]+ \d{3})|(?:\d{3}(?!-| level))", greq)
 
         for dup in duplicates:
             if re.search("^\d{3}", dup):
@@ -150,8 +149,6 @@ def parseReqs(string, target, rORc):
             while valid == False:
                 print("**Need manual input**")
                 print("Requisite: " + greq)
-                
-
 
                 ### Currently set to skip for developing ###
                 source = "skip"
@@ -177,39 +174,40 @@ def parseReqs(string, target, rORc):
                     valid = False
                     print("**Invalid entry**")
         
+def addNodes():
+    #Create new nodes and links
+    for node in scrapeData:
+        if node["desc"] == "No description":
+            # print("No description for: " + node["title"] + ". Skipping node")
+            continue
+        
+        matches = [dNode["title"] for dNode in data["nodes"] if dNode["title"] == node["title"]]
+        if len(matches) > 0:
+            print("Already have nodes for: " + node["title"] + ". Skipping node")
+            continue
+        
+        subject = re.search(".*(?= \d)", node["title"])
+        color = colorDict[subject.group()]
+        global nodeIdCounter
+        data["nodes"].append({ "id": nodeIdCounter, "title": node["title"], "desc": node["desc"], "color": color})
+        nodeIdCounter += 1
 
-#Create new nodes and links
-for node in scrapeData:
-    if node["desc"] == "No description":
-        # print("No description for: " + node["title"] + ". Skipping node")
-        continue
-    
-    matches = [dNode["title"] for dNode in data["nodes"] if dNode["title"] == node["title"]]
-    if len(matches) > 0:
-        print("Already have nodes for: " + node["title"] + ". Skipping node")
-        continue
-    
-    subject = re.search("[A-Z]*", node["title"])
-    color = colorDict[subject.group()]
-    data["nodes"].append({ "id": nodeIdCounter, "title": node["title"], "desc": node["desc"], "color": color})
-    nodeIdCounter += 1
+        coreqs = re.search("((?<=Corequisites: ).*?(?=(\.)|(.$)))|((?<=Corequisite: ).*?(?=(\.)|(.$)))", node["desc"])
+        reqs = re.search("((?<=Prerequisites: ).*?(?=\.|(.$)))|((?<=Prerequisite: ).*?(?=(\.)|(.$)))", node["desc"])
+        if coreqs and reqs:
 
-    coreqs = re.search("(?<=Corequisites: ).*?(?=( [cC]redit)|(.$))", node["desc"])
-    reqs = re.search("(?<=Prerequisites: ).*?(?=( [cC]redit)|(.$))", node["desc"])
-    if coreqs and reqs:
+            reqs = re.search("((?<=Prerequisites: ).*(?=. Corequisite))|((?<=Prerequisite: ).*(?=. Corequisite))", node["desc"])
+            parseReqs(reqs.group(), node["title"], "R")
+            parseReqs(coreqs.group(), node["title"], "C")
 
-        reqs = re.search("(?<=Prerequisites: ).*(?=. Corequisites)", node["desc"])
-        parseReqs(reqs.group(), node["title"], "R")
-        parseReqs(coreqs.group(), node["title"], "C")
+        elif reqs:
+            parseReqs(reqs.group(), node["title"], "R")
+        elif coreqs:
+            parseReqs(coreqs.group(), node["title"], "C")
 
-    elif reqs:
-        parseReqs(reqs.group(), node["title"], "R")
-    elif coreqs:
-        parseReqs(coreqs.group(), node["title"], "C")
-
-    else:
-        continue
-
+        else:
+            continue
+addNodes()
 # def updateDesc():
 #     for node in scrapeData:
 #         scrapeTitles.append(node["title"])
@@ -229,19 +227,21 @@ def renameLinks():
     for link in data["links"]:
         if type(link["source"]) is int:
             continue
-        sourceId = [node["id"] for node in data["nodes"] if node["title"] == link["source"]]
+        sourceId = [node["id"] for node in data["nodes"] if link["source"] in node["title"]]
         targetId = [node["id"] for node in data["nodes"] if node["title"] == link["target"]]
 
         if len(sourceId) > 0 and len(targetId) > 0:
             link["source"] = sourceId[0]
             link["target"] = targetId[0]
         elif len(sourceId) == 0:
+
             source = str(link["source"])
             print("Could not find id for: " + source)
 
+
             data["links"] = [dLink for dLink in data["links"] if dLink["target"] != link["target"]]
         else:
-            print("I'm not sure what happened")
+            print("Undefined error: " + link["target"])
 renameLinks()
 
 def removeNodes():
