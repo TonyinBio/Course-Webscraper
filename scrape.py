@@ -82,7 +82,8 @@ for URL in URLs:
 
 data = {
     "nodes" : [],
-    "links" : []
+    "links" : [],
+    "subjects": subjects
 }
 nodeIdCounter = 0
 
@@ -95,6 +96,7 @@ def parseReqs(string, target, rORc):
 
 
     ##TODO: Improve splitter
+    ##TODO: Make CHEM 101 in CHEM 261
     greqArray = re.split("(?:(?:;)? and )|; ", string)
     for greq in greqArray:
         #find multiple possible courses
