@@ -43,6 +43,8 @@ subjects = [
     "FIN"
 ]
 
+subjects.sort()
+
 colorDict = dict(zip(subjects, ["rgb" + str(tuple(int(c*255) for c in cs)) for cs in sns.color_palette("husl", len(subjects))]))
 
 scrapeData = []
@@ -69,7 +71,6 @@ def getNodes(URL):
 URLs = []
 for subject in subjects:
     URLs.append("https://apps.ualberta.ca/catalogue/course/" + subject.lower())
-print(URLs)
 
 for URL in URLs:
     getNodes(URL)
@@ -83,76 +84,89 @@ for URL in URLs:
 data = {
     "nodes" : [],
     "links" : [],
-    "subjects": subjects
+    "subjects": subjects,
+    "noLinks": [],
 }
 nodeIdCounter = 0
 
 scrapeTitles = []
 
 
-
+def toUpper(matchObj):
+    return matchObj.group().upper()
 def parseReqs(string, target, rORc):
     #split string based on different courses
 
 
     ##TODO: Improve splitter
-    ##TODO: Make CHEM 101 in CHEM 261
-    greqArray = re.split("(?:(?:;)? and )|; ", string)
-    for greq in greqArray:
-        #find multiple possible courses
-
-        if re.search("\d{3}", greq) == None:
-            print("Skipping: " + greq)
+    ## Math 317 is skipped -- because it is not all caps
+    reqArray = re.split("(?:(?:;)? and )|; ", string)
+    for req in reqArray:
+        
+        #Check if string has a 3 digit number
+        if re.search("\d{3}", req) == None:
+            # print("Skipping: " + req)
             continue
+        #Check if a string has a 3 digit number at the beginning
+        if re.search("^\d{3}(?!-| level)", req):
+            index = reqArray.index(req)
+            i = 1
+            siblingReq = None
+            while siblingReq == None:
+                siblingReq = re.search("(?<![^A-Z ])[A-Z ]+(?= \d{3})", reqArray[index - i])
+                i += 1
+            req = siblingReq.group() + " " + req
 
-        if re.search("^\d{3}", greq):
-            index = greqArray.index(greq)
-            prevGreq = re.search("[A-Z]*", greqArray[index - 1])
+        #Check if a string has been spelt without uppercase by accident...
+        req = re.sub("[A-Z][a-z]\w+", toUpper, req)
 
-            greq = prevGreq.group() + " " + greq
-
-        duplicates = re.findall("(?:(?<![a-z,])[A-Z ]+ \d{3})|(?:\d{3}(?!-| level))", greq)
-
-        for dup in duplicates:
-            if re.search("^\d{3}", dup):
-                prevDup = re.search("[A-Z]*", duplicates[0])
-
-                index = duplicates.index(dup)
-                duplicates[index] = prevDup.group() + " " + dup
+        #Find course codes by looking for all caps followed by a 3 digit number
+        duplicates = re.findall("(?:(?<![^A-Z (])[A-Z ]+ \d{3})(?!-| level)|(?:\d{3})(?!-| level)", req)
 
         if len(duplicates) > 1:
             #assign special link
-
-            source = duplicates[0]
-
+            
             for dup in duplicates:
-                
-                matches = [node["title"] for node in data["nodes"] if node["title"] == dup]
-                if len(matches) > 0:
-                    source = dup
-                    break
-     
-            data["links"].append({ "source": source, "target": target, "type": "multi" + rORc})
+                index = duplicates.index(dup)
+                if re.search("^\d{3}", dup):
+                    siblingDup = None
+                    i = 1
+                    while siblingDup == None:
+                        siblingDup = re.search("(?<![^A-Z ])[A-Z ]+(?= \d{3})", duplicates[index - i])
+                        i += 1
+                    duplicates[index] = siblingDup.group() + " " + dup
+
+                source = duplicates[index]
+                if index > 0:
+                    data["links"].append({ "source": source, "target": target, "type": "multi" + rORc, "duplicate": True})
+                else:
+                    data["links"].append({ "source": source, "target": target, "type": "multi" + rORc})
+            # source = duplicates[0]
+
+            # for dup in duplicates:
+            #     matches = [node["title"] for node in data["nodes"] if node["title"] == dup]
+            #     if len(matches) > 0:
+            #         source = dup
+            #         break
+
+            # data["links"].append({ "source": source, "target": target, "type": "multi" + rORc})
 
         elif len(duplicates) == 1:
             #assign normal link
-
             source = duplicates[0]
-            
             data["links"].append({ "source": source, "target": target, "type": "norm" + rORc})
             
         else:
             #check for common exceptions
-            if "consent" in greq:
+            if "consent" in req:
                 break
-
             #get manual input
             valid = False
             while valid == False:
-                print("**Need manual input**")
-                print("Requisite: " + greq)
-
                 ### Currently set to skip for developing ###
+
+                # print("**Need manual input**")
+                # print("Requisite: " + req)
                 source = "skip"
                 
                 if source == "skip":
@@ -160,14 +174,13 @@ def parseReqs(string, target, rORc):
                 if source == "more info":
                     print("Class: " + target)
                     print("Parsed description:")
-                    print(greqArray)
+                    print(reqArray)
                     continue
                 if source == "two":
                     #create two sources
-                    #by adding a duplicate greq to the next entry in greqArray
-                    index = greqArray.index(greq)
-                    greqArray.insert(index, greq)
-
+                    #by adding a duplicate req to the next entry in reqArray
+                    index = reqArray.index(req)
+                    reqArray.insert(index, req)
                 source = re.findall("[A-Z]+ \d{3}", source)
                 if len(source) == 1:
                     valid = True
@@ -179,7 +192,8 @@ def parseReqs(string, target, rORc):
 def addNodes():
     #Create new nodes and links
     for node in scrapeData:
-        if node["desc"] == "No description":
+        desc = re.sub(" {2,}", " ", node["desc"])
+        if desc == "No description":
             # print("No description for: " + node["title"] + ". Skipping node")
             continue
         
@@ -191,22 +205,20 @@ def addNodes():
         subject = re.search(".*(?= \d)", node["title"])
         color = colorDict[subject.group()]
         global nodeIdCounter
-        data["nodes"].append({ "id": nodeIdCounter, "title": node["title"], "desc": node["desc"], "color": color})
+        data["nodes"].append({ "id": nodeIdCounter, "title": node["title"], "desc": desc, "color": color})
         nodeIdCounter += 1
 
-        coreqs = re.search("((?<=Corequisites: ).*?(?=(\.)|(.$)))|((?<=Corequisite: ).*?(?=(\.)|(.$)))", node["desc"])
-        reqs = re.search("((?<=Prerequisites: ).*?(?=\.|(.$)))|((?<=Prerequisite: ).*?(?=(\.)|(.$)))", node["desc"])
-        if coreqs and reqs:
-
-            reqs = re.search("((?<=Prerequisites: ).*(?=. Corequisite))|((?<=Prerequisite: ).*(?=. Corequisite))", node["desc"])
-            parseReqs(reqs.group(), node["title"], "R")
+        coreqs = re.search("((?<=Corequisites: ).*?(?=(\.)|(.$)))|((?<=Corequisite: ).*?(?=(\.)|(.$)))|((?<=Corequisite ).*?(?=\.|(.$)))|((?<=Corequisites ).*?(?=\.|(.$)))",
+            desc)
+        prereqs = re.search("((?<=Prerequisites: ).*?(?=\.|(.$)))|((?<=Prerequisite: ).*?(?=(\.)|(.$)))|((?<=Prerequisite ).*?(?=\.|(.$)))|((?<=Prerequisites ).*?(?=\.|(.$)))",
+            desc)
+        if coreqs and prereqs:
+            parseReqs(prereqs.group(), node["title"], "R")
             parseReqs(coreqs.group(), node["title"], "C")
-
-        elif reqs:
-            parseReqs(reqs.group(), node["title"], "R")
+        elif prereqs:
+            parseReqs(prereqs.group(), node["title"], "R")
         elif coreqs:
             parseReqs(coreqs.group(), node["title"], "C")
-
         else:
             continue
 addNodes()
@@ -227,20 +239,18 @@ addNodes()
 
 def renameLinks():
     for link in data["links"]:
+
         if type(link["source"]) is int:
             continue
+
         sourceId = [node["id"] for node in data["nodes"] if link["source"] in node["title"]]
         targetId = [node["id"] for node in data["nodes"] if node["title"] == link["target"]]
-
         if len(sourceId) > 0 and len(targetId) > 0:
             link["source"] = sourceId[0]
             link["target"] = targetId[0]
         elif len(sourceId) == 0:
-
-            source = str(link["source"])
-            print("Could not find id for: " + source)
-
-
+            source = link["source"]
+            print("Could not find id for: " + source + ". Target: " + link["target"])
             data["links"] = [dLink for dLink in data["links"] if dLink["target"] != link["target"]]
         else:
             print("Undefined error: " + link["target"])
@@ -252,8 +262,9 @@ def removeNodes():
         linksThatUse = [link for link in data["links"] if link["source"] == node["id"]]
 
         if len(linksThatTarget) == 0 and len(linksThatUse) == 0:
-            data["nodes"] = [dNode for dNode in data["nodes"] if dNode["title"] != node["title"]]
+            data["noLinks"].append(node["title"])
+            # data["nodes"] = [dNode for dNode in data["nodes"] if dNode["title"] != node["title"]]
 removeNodes()
 
-with open("UPcourse2.json", "w") as outfile:
+with open("../TonyinBio.github.io/projects/bigplanner/dags/UPcourse2.json", "w") as outfile:
     json.dump(data, outfile)
