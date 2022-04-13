@@ -99,7 +99,6 @@ def parseReqs(string, target, rORc):
 
 
     ##TODO: A and B get equal treatment PHYSL 210A vs B
-    ## Math 317 is skipped -- because it is not all caps
     reqArray = re.split("(?:(?:;)? and )|; ", string)
     for req in reqArray:
         
