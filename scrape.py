@@ -68,9 +68,19 @@ def getNodes(URL):
             else:
                 scrapeData.append({ "title" : title.group(), "desc" : "No description" })
 
-URLs = []
-for subject in subjects:
-    URLs.append("https://apps.ualberta.ca/catalogue/course/" + subject.lower())
+
+BASE_URL = "https://apps.ualberta.ca/catalogue/course/"
+
+def getSubjects() -> list:
+    page = requests.get(BASE_URL)
+    soup = BeautifulSoup(page.content, "html.parser")
+    URLs = [BASE_URL + re.search(r"(?<=\/)\w+$", tag["href"]).group() for tag in soup.find_all("a", class_="d-block")]
+
+    return URLs
+
+URLs = getSubjects()
+
+# print(URLs)
 
 for URL in URLs:
     getNodes(URL)
