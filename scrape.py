@@ -5,53 +5,36 @@ import re
 
 import seaborn as sns
 
-subjects = [
-    "CMPUT",
-    "ZOOL",
-    "PHYSL",
-    "ANAT",
-    "CELL",
-    "BIOCH",
-    "MDGEN",
-    "NEURO",
-    "ONCOL",
-    "PMCOL",
-    "CHEM",
-    "BIOIN",
-    "ASTRO",
-    "PSYCO",
-    "MICRB",
-    "PHYS",
-    "MATH",
-    "STAT",
-    "BIOL",
-    "GENET",
-    "IMIN",
-    "ENGG",
-    "ANTHR",
-    "FS",
-    "ENGL",
-    "WRS",
-    "HIST",
-    "PHIL",
-    "SOC",
-    "ECON",
-    "ENT",
-    "FIN"
-]
+from pprint import pprint
 
-subjects.sort()
+# # read the subjects of interest
+# with open("./subjects.txt", "r") as file:
+#     SUBJECTS = [subject.strip() for subject in file.readlines()]
 
-colorDict = dict(zip(subjects, ["rgb" + str(tuple(int(c*255) for c in cs)) for cs in sns.color_palette("husl", len(subjects))]))
+def generateColors(subjects, palette: str = "husl") -> dict:
+    """
+    Assign rgb values scaled to 255 for each subject in SUBJECTS
+        palette: name of seaborn palette
 
-scrapeData = []
+        return: key=subjectName, value=rgb
+    """
+    colors = sns.color_palette(palette, len(subjects))
+    formattedColors = ["rgb" + str(tuple([int(color)*255] for color in rgb)) for rgb in colors]
+    return dict(zip(subjects, formattedColors))
 
-def getNodes(URL):
+def getNodes(URL: str) -> list[dict]:
+    """
+    Scan the specific subject for all classes
+        URL: URL to subject page
+
+        return: list of classes with associated description
+    """
     page = requests.get(URL)
     soup = BeautifulSoup(page.content, "html.parser")
 
     results = soup.find_all("div", class_="course first")
 
+    scrapeData = []
     for element in results:
         title = element.find("a") 
         desc = element.find("p")
@@ -65,212 +48,53 @@ def getNodes(URL):
             else:
                 scrapeData.append({ "title" : title.group(), "desc" : "No description" })
 
+    return scrapeData
 
-BASE_URL = "https://apps.ualberta.ca/catalogue/course/"
+def generateSubjectList(subjectTags: list) -> list:
+    subjects = []
+    subjectCodePattern = r"^[A-Z ]+"
+    for tag in subjectTags:
+        subjectCode = re.search(subjectCodePattern, tag.text.strip()).group().strip()
+        subjects.append(subjectCode)
 
-def getSubjects() -> list:
-    page = requests.get(BASE_URL)
+    return subjects
+
+def getSubjects(baseUrl: str) -> tuple[list[str], list[str]]:
+    """
+    Looks on the course catalogue for all subjects of interest
+        baseUrl: course catalgoue URL
+
+        return: list of URLs to subject webpages
+    """
+    page = requests.get(baseUrl)
     soup = BeautifulSoup(page.content, "html.parser")
-    URLs = [BASE_URL + re.search(r"(?<=\/)\w+$", tag["href"]).group() for tag in soup.find_all("a", class_="d-block")]
+    subjectTags = soup.find_all("a", class_="d-block")
+    urls = [baseUrl + re.search(r"(?<=\/)\w+$", tag["href"]).group() for tag in subjectTags]
+    
+    subjects = generateSubjectList(subjectTags)
 
-    return URLs
+    return urls, subjects
 
-URLs = getSubjects()
+def scrape() -> list:
+    """
+    Scrape courses
+        return: list of classes (across subjects of interest) with associated description
+    """
+    catalogueUrl = "https://apps.ualberta.ca/catalogue/course/"
+    urls, subjects = getSubjects(catalogueUrl)
 
-# print(URLs)
+    scrapeRaw = []
+    for url in urls:
+        scrapeRaw.extend(getNodes(url))
+    
+    # saving raw for testing
+    with open("./cache/scrape-raw.json", "w") as file:
+        json.dump(scrapeRaw, file)
+    with open("./cache/subjects.json", "w") as file:
+        json.dump(subjects, file)
 
-for URL in URLs:
-    getNodes(URL)
-
-
-# with open('course2.json', encoding = 'utf-8') as json_file:
-#     data = json.load(json_file)
-# highestNode = max(data["nodes"], key = lambda node: node["id"])
-# nodeIdCounter = highestNode["id"]
-
-data = {
-    "nodes" : [],
-    "links" : [],
-    "subjects": subjects,
-    "noLinks": [],
-}
-nodeIdCounter = 0
-
-scrapeTitles = []
-
-
-def toUpper(matchObj):
-    return matchObj.group().upper()
-def parseReqs(string, target, rORc):
-    #split string based on different courses
+    return scrapeRaw, subjects
 
 
-    ##TODO: A and B get equal treatment PHYSL 210A vs B
-    reqArray = re.split("(?:(?:;)? and )|; ", string)
-    for req in reqArray:
-        
-        #Check if string has a 3 digit number
-        if re.search("\d{3}", req) == None:
-            # print("Skipping: " + req)
-            continue
-        #Check if a string has a 3 digit number at the beginning
-        if re.search("^\d{3}(?!-| level)", req):
-            index = reqArray.index(req)
-            i = 1
-            siblingReq = None
-            while siblingReq == None:
-                siblingReq = re.search("(?<![^A-Z ])[A-Z ]+(?= \d{3})", reqArray[index - i])
-                i += 1
-            req = siblingReq.group() + " " + req
-
-        #Check if a string has been spelt without uppercase by accident...
-        req = re.sub("[A-Z][a-z]\w+", toUpper, req)
-
-        #Find course codes by looking for all caps followed by a 3 digit number
-        duplicates = re.findall("(?:(?<![^A-Z (])[A-Z ]+ \d{3})(?!-| level)|(?:\d{3})(?!-| level)", req)
-
-        if len(duplicates) > 1:
-            #assign special link
-            
-            for dup in duplicates:
-                index = duplicates.index(dup)
-                if re.search("^\d{3}", dup):
-                    siblingDup = None
-                    i = 1
-                    while siblingDup == None:
-                        siblingDup = re.search("(?<![^A-Z ])[A-Z ]+(?= \d{3})", duplicates[index - i])
-                        i += 1
-                    duplicates[index] = siblingDup.group() + " " + dup
-
-                source = duplicates[index]
-                if index > 0:
-                    data["links"].append({ "source": source, "target": target, "type": "multi" + rORc, "duplicate": True})
-                else:
-                    data["links"].append({ "source": source, "target": target, "type": "multi" + rORc})
-            # source = duplicates[0]
-
-            # for dup in duplicates:
-            #     matches = [node["title"] for node in data["nodes"] if node["title"] == dup]
-            #     if len(matches) > 0:
-            #         source = dup
-            #         break
-
-            # data["links"].append({ "source": source, "target": target, "type": "multi" + rORc})
-
-        elif len(duplicates) == 1:
-            #assign normal link
-            source = duplicates[0]
-            data["links"].append({ "source": source, "target": target, "type": "norm" + rORc})
-            
-        else:
-            #check for common exceptions
-            if "consent" in req:
-                break
-            #get manual input
-            valid = False
-            while valid == False:
-                ### Currently set to skip for developing ###
-
-                # print("**Need manual input**")
-                # print("Requisite: " + req)
-                source = "skip"
-                
-                if source == "skip":
-                    break
-                if source == "more info":
-                    print("Class: " + target)
-                    print("Parsed description:")
-                    print(reqArray)
-                    continue
-                if source == "two":
-                    #create two sources
-                    #by adding a duplicate req to the next entry in reqArray
-                    index = reqArray.index(req)
-                    reqArray.insert(index, req)
-                source = re.findall("[A-Z]+ \d{3}", source)
-                if len(source) == 1:
-                    valid = True
-                    data["links"].append({ "source": source[0], "target": target, "type": "multi" + rORc})
-                else:
-                    valid = False
-                    print("**Invalid entry**")
-        
-def addNodes():
-    #Create new nodes and links
-    for node in scrapeData:
-        desc = re.sub(" {2,}", " ", node["desc"])
-        if desc == "No description":
-            # print("No description for: " + node["title"] + ". Skipping node")
-            continue
-        
-        matches = [dNode["title"] for dNode in data["nodes"] if dNode["title"] == node["title"]]
-        if len(matches) > 0:
-            print("Already have nodes for: " + node["title"] + ". Skipping node")
-            continue
-        
-        subject = re.search(".*(?= \d)", node["title"])
-        color = colorDict[subject.group()]
-        global nodeIdCounter
-        data["nodes"].append({ "id": nodeIdCounter, "title": node["title"], "desc": desc, "color": color})
-        nodeIdCounter += 1
-
-        coreqs = re.search("((?<=Corequisites: ).*?(?=(\.)|(.$)))|((?<=Corequisite: ).*?(?=(\.)|(.$)))|((?<=Corequisite ).*?(?=\.|(.$)))|((?<=Corequisites ).*?(?=\.|(.$)))",
-            desc)
-        prereqs = re.search("((?<=Prerequisites: ).*?(?=\.|(.$)))|((?<=Prerequisite: ).*?(?=(\.)|(.$)))|((?<=Prerequisite ).*?(?=\.|(.$)))|((?<=Prerequisites ).*?(?=\.|(.$)))",
-            desc)
-        if coreqs and prereqs:
-            parseReqs(prereqs.group(), node["title"], "R")
-            parseReqs(coreqs.group(), node["title"], "C")
-        elif prereqs:
-            parseReqs(prereqs.group(), node["title"], "R")
-        elif coreqs:
-            parseReqs(coreqs.group(), node["title"], "C")
-        else:
-            continue
-addNodes()
-# def updateDesc():
-#     for node in scrapeData:
-#         scrapeTitles.append(node["title"])
-
-#     def getDesc(title):
-#         for node in scrapeData:
-#             if node["title"] == title:
-#                 return node["desc"]
-
-
-#     for node in data["nodes"]:
-#         if node["title"] in scrapeTitles and "desc" not in node:
-#             node.update({"desc": "From course catalogue: " + getDesc(node["title"])})
-# updateDesc()
-
-def renameLinks():
-    for link in data["links"]:
-
-        if type(link["source"]) is int:
-            continue
-
-        sourceId = [node["id"] for node in data["nodes"] if link["source"] in node["title"]]
-        targetId = [node["id"] for node in data["nodes"] if node["title"] == link["target"]]
-        if len(sourceId) > 0 and len(targetId) > 0:
-            link["source"] = sourceId[0]
-            link["target"] = targetId[0]
-        elif len(sourceId) == 0:
-            source = link["source"]
-            print("Could not find id for: " + source + ". Target: " + link["target"])
-            data["links"] = [dLink for dLink in data["links"] if dLink["target"] != link["target"]]
-        else:
-            print("Undefined error: " + link["target"])
-renameLinks()
-
-def removeNodes():
-    for node in data["nodes"]:
-        linksThatTarget = [link for link in data["links"] if link["target"] == node["id"]]
-        linksThatUse = [link for link in data["links"] if link["source"] == node["id"]]
-
-        if len(linksThatTarget) == 0 and len(linksThatUse) == 0:
-            data["noLinks"].append(node["title"])
-            # data["nodes"] = [dNode for dNode in data["nodes"] if dNode["title"] != node["title"]]
-removeNodes()
-
-with open("../TonyinBio.github.io/projects/bigplanner/dags/UPcourse2.json", "w") as outfile:
-    json.dump(data, outfile)
+if __name__ == "__main__":
+    scrape()
