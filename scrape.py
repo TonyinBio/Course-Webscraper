@@ -1,6 +1,3 @@
-from base64 import encode
-from operator import contains
-from xml.etree.ElementTree import tostring
 import requests
 from bs4 import BeautifulSoup
 import json
