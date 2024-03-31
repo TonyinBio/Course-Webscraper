@@ -19,7 +19,7 @@ def generateColors(subjects, palette: str = "husl") -> dict:
         return: key=subjectName, value=rgb
     """
     colors = sns.color_palette(palette, len(subjects))
-    formattedColors = ["rgb" + str(tuple([int(color)*255] for color in rgb)) for rgb in colors]
+    formattedColors = ["rgb" + str(tuple(int(color)*255 for color in rgb)) for rgb in colors]
     return dict(zip(subjects, formattedColors))
 
 def getNodes(URL: str) -> list[dict]:
